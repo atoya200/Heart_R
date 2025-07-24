@@ -1,7 +1,7 @@
 ## Tabla descriptiva sobre cada dato presente en el dataset original
 
 | Variable | Descripción | Valores posibles |
-|------------------|--------------------------------|-----------------------|
+|----|----|----|
 | `death` | Muerte del paciente durante el seguimiento | 0 = No, 1 = Sí |
 | `los` | Duración de la estadía hospitalaria (en noches) | Número entero positivo |
 | `age` | Edad del paciente (en años) | Número entero positivo |
