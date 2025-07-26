@@ -1,12 +1,39 @@
+#Cargamos librerias
 library(tidyverse)
 library(janitor)
 library(readxl)
+library(pheatmap)
+
 
 # Cargamos los valores del archivo fuente
 datos = read_csv("datasets/simulated_HF_mort_data_for_GMPH.csv") 
 
+# Cantidad de filas y columnas originalmente
+dim(datos)
 
+
+
+# Revisamos los nombres de las variables/columnas
 colnames(datos)
+
+# Usamos summary para ver si hay o no NAs en cada columna
+summary(datos)
+
+# Comprobar si hay duplicados
+cant_duplicados = datos |> 
+      duplicated() |> 
+      sum()
+
+# Otra opción para ver si hay NAs es usar colSums, si solo nos interesa ese dato
+colSums(datos)
+
+# Junto a la opción anterior, se pueda hacer uso de la función names para ver
+# que columnas es que tienen estos valores
+names(which(colSums(is.na(datos)) > 0))
+
+
+# Emitimos mensaje para confirmar que hay o no hay
+print(if_else(cant_duplicados != 0, paste('Hay duplicados:', cant_duplicados), 'No hay duplicados' ) )
 
 # Con estos pipe hacemos: 
 # Filtrado de datos 
@@ -14,94 +41,97 @@ colnames(datos)
 #           death tiene que ser 0 o 1
 # Seleccionamos una serie de variables
 # Usamos distinct para quedarnos con valor únicos, tomando 
-# el primero que encontremos, distinguiendo entre id y genero más que nada
-# dado que si hay un dato ingresado de un paciente dos veces, pero lo que cambia
-# es que en un registro tenía obesidad y en el otro no, con usar
-# un distinct generico ya nos va a decir que son dos campos distintos
-# REVISAR USO DE DISTINCT
-filtrados =   select(datos,
-                   id,
-                   death,
-                   age,
-                   gender,
-                   copd,
-                   diabetes,
-                   obesity,
-                   renal_disease,
-                   hypertension,
-                   ihd,
-                   pvd,
-                   valvular_disease,
-                   pacemaker,
-                   cancer,
-                   pneumonia) |>
-                        distinct() |> 
-                        filter(!is.na(id), death == 0 | death == 1)
+# el primero que encontremos, distinguiendo entre todos los casos 
+# como se pedía en la letra
+filtrados =   datos |>  
+      filter(!is.na(id), death == 0 | death == 1) |> 
+      select(id,
+             los,
+             death,
+             age,
+             gender,
+             copd,
+             diabetes,
+             obesity,
+             renal_disease,
+             hypertension,
+             ihd,
+             pvd,
+             valvular_disease,
+             pacemaker,
+             cancer,
+             pneumonia) |>
+                        drop_na() |> 
+                        distinct()
 
+# Al poner el drop_na al final, hacemos que se eliminen los registros
+# luego de hacer el filtrado. Si se hiciera antes del filter
+# quedarían cerca de 950 registros de 1000 por el faltante 
+# en la variable de grupo étnico, el cual para la pregunta planteada
+# no nos es de utilidad
 
-# Una vez omitidas las columnas con NA importantes para la resolución de 
-# la pregunta, pasamos a remplazar los valores por el promedio de los valores
-# más cercanos
+# Primero vamos a obtener dos subconjuntos, uno de vivos y otro de fallecidos
+sobrevientes = filter(filtrados, death == 0)
+fallecidos = filter(filtrados, death == 1)
 
-# Retocar y ver con que valor remplazar
-#filtrados = filtrados |> 
-#      mutate(
-#            gender_NA=replace_na(gender,(gender,na.rm=T)) 
-#      ) |> 
-#      view()
-
-# Primero vamos a obtener dos subconjuntos, uno de vivos y otro de muertos
-sobrevientes = filter(filtrados, death == 1)
-fallecidos = filter(filtrados, death == 0)
-
-# Maximo y minimo de edad de los fallecidos
-edad_maxima_f = max(fallecidos$age)
-edad_minima_f = min(fallecidos$age)
-
-############ Fallecidos
-# Vamos a ver que tan presentes estaban las enferemedades elegidas
-# en los pacientes que fallecieron
-
-# Generamos una vista sobre los datos de las enferemdades prexistentes evaluar
-# los casos de fallecimientos en los que si se tenía estas condiciones
-freq_rel_enferm_prexistentes_f  = fallecidos |> 
-      count(copd,diabetes,obesity,renal_disease, hypertension,ihd,pvd,valvular_disease,cancer,pneumonia, name = "freq_abs") |> 
-      mutate(copd_freq_rel = 100* freq_abs/sum(freq_abs))
+# Maximo y mínimo de edades por fallecidos/sobrevientes 
+# luego de la falla cardíaca
+edades  = data.frame(
+            "vivo" = c(1, 0),
+            "edad_maxima" = c(max(sobrevientes$age),max(fallecidos$age)), 
+            "edad_minima" = c(min(sobrevientes$age),min(fallecidos$age))
+          )
       
-# Solo para visualizar los datos con sus totales
-freq_rel_enferm_prexistentes_f |> 
-      adorn_totals(where = c("row")) |> 
-      View()
+
+# Frecuencias relativas y absolutas
+
+# Total de registros del dataframe filtrado
+cant_filas = nrow(filtrados)
+
+# Frecuencia relativa de la variable fallecimiento
+freqs = filtrados |> 
+      count(death, name = "frec_abs") |> 
+      mutate(
+            freq_rel=frec_abs/nro_rows
+      ) |> 
+      
+      
+# Calculo de mediana, media y desviación estándar
+mediana = median(filtrados$age)
+media = mean(filtrados$age)
+desviacion = round(sd(filtrados$age), 2)
+
+# Vamos con los graficos
+
+# Grafico de Barras
+# Edades y estado
+filtrados |> 
+      ggplot(aes(x=death))+
+      geom_bar()
+
+#Dispersión
+filtrados |> 
+      mutate(death = if_else(death == 0, 'No', 'Si')) |> 
+      ggplot()+
+      geom_point(aes(x= age,
+                     y=los,
+                     color=death
+      )
+      )
+
+# De mientras, la correlación la podemos ver de esta forma
+coeficientes = filtrados |> 
+      #con esto selecciono todas las variables numéricas
+      select(los, age) |> 
+      cor() 
+
+coeficiente = round(coeficientes[1, 2], 2)
+
+# Boxplot
+filtrados |> 
+      mutate(death = if_else(death == 0, 'No', 'Si')) |> 
+      ggplot(aes(x=age,y=death))+
+      geom_boxplot()
 
 
-############ Vivos
-# Maximo y minimo de edad de los sobrevientes
-edad_maxima_s = max(sobrevientes$age)
-edad_minima_s = min(sobrevientes$age)
 
-
-# Generamos una vista sobre los datos de las enferemdades prexistentes evaluar
-# los casos donde los pacientes sobrevivieron a una falla cardiaca
-# en los que si se tenía estas condiciones
-freq_rel_enferm_prexistentes_s  = sobrevientes |> 
-      count(copd,diabetes,obesity,renal_disease, hypertension,ihd,pvd,valvular_disease,cancer,pneumonia, name = "freq_abs") |> 
-      mutate(copd_freq_rel = 100* freq_abs/sum(freq_abs))
-
-# Solo para visualizar los datos con sus totales
-freq_rel_enferm_prexistentes_s |> 
-      adorn_totals(where = c("row")) |> 
-      View()
-
-
-###############################
-
-
-# Ahora obtenemos la cantidad de veces que estaba presente cada enfermeedad, es
-# decir, genermaosu un nuevo df con los datos de totales, para tener esa info
-totales = fallecidos |> 
-            mutate(
-                  cantidad_copb = ?count()
-            )
-
-# A continuación lo que voy a hacer es buscar sobre precondiciones de tratamietno
-# es decir, marcapasos, operaciones, etc
