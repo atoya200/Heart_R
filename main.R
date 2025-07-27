@@ -454,7 +454,7 @@ hg_edades_por_estado
 gd_edades_hispitalizacion = 
       filtrados |> 
       mutate(death = if_else(death == 0, FALSE, TRUE)) |> 
-      ggplot(aes(x = age, y = los, color = death), alpha=0.4) + 
+      ggplot(aes(x = age, y = los, color = death)) + 
       geom_point() +
       labs(
             title = "Distribución de edades según tiempo de hospitalización con coloreado por estado",
