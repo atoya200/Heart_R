@@ -67,8 +67,8 @@ guardar_archivos = function(lista_archivos){
                   ruta_completa,
                   plot = plot,
                   scale = 1,
-                  width = 3840,      
-                  height = 2160 ,     
+                  width = 2560,      
+                  height =  1440,     
                   units = "px",
                   limitsize = FALSE,
                   bg = 'white'
@@ -335,9 +335,9 @@ gf_enfermedades = freq_enfermedades |>
                                 "obesity" = "Obesidad",
                                 "renal_disease" = "Enfermedad Renal",
                                 "hypertension" = "Hipertensión",
-                                "ihd" = "Cardiopatía isquémica",
+                                "ihd" = "Cardiopatía Isquémica",
                                 "pvd" = "Enfermedad Vascular Periférica",
-                                "valvular_disease" = "Enfermedad valvular cardíaca",
+                                "valvular_disease" = "Enfermedad Valvular Cardíaca",
                                 "cancer" = "Cáncer",
                                 "pneumonia" = "Neumonía",
                                 "stroke" = "ACV")
@@ -352,7 +352,8 @@ gf_enfermedades = freq_enfermedades |>
       ) +
       scale_fill_manual(values = c("Vivos" = "blue", "Fallecidos" = "red")) +
       scale_y_continuous(breaks = seq(0, 60, by = 5)) +
-      theme_minimal()
+      theme_minimal()+
+      coord_flip()
 
 
 
@@ -396,7 +397,7 @@ gf_cant_enfermeddes
 # Histograma de personas que sobrevivieron
 hg_sobrevivientes =  sobrevivientes |> 
       ggplot(aes(x=age))+
-      geom_histogram(fill="darkolivegreen3", color='black',
+      geom_histogram(fill="blue",
                      bins = 20)+
       labs(
             title = "Distribución de edades de los sobrevivientes",
@@ -413,7 +414,7 @@ hg_sobrevivientes
 # Histograma de personas que no sobrevivieron
 hg_fallecidos = fallecidos |> 
       ggplot(aes(x=age))+
-      geom_histogram(fill="red", color='black',
+      geom_histogram(fill="red",
                bins = 20)+
       labs(
             title = "Distribución de edades de los fallecidos",
