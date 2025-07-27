@@ -10,18 +10,30 @@ library(rlang)
 # Funciones
 # Como son varias variables lo que hacemos es generar una función
 # que cree un data_frame vacio y luego le vaya haciendo
-# binds con el resultado de calcular la frecuencia absoluta y la 
-# relativa para cada valor pasado en en vector
-calcular_freqs = function(data_frame, lista_variables) {
+# binds_rows con el resultado de calcular la frecuencia absoluta y la 
+# relativa para cada variable  pasada en en vector
+calcular_freqs = function(data_frame, vector_variables) {
+      
+      # Creación del dataframe vacio
       freqs_data_frame <- data.frame(valor = logical(),
                                      frec_abs = numeric(),
                                      frec_rel = numeric(),
                                      variable = character())
       
+      # Obtenemos la cantidad de filas que tiene el dataframe actual
       cant_filas = nrow(data_frame)
       
-      for(var in lista_variables) {
+      # Iteramos sobre los elementos del vector
+      for(var in vector_variables) {
+            # Es como si le agregaramos el simbolo de pesos, para poder
+            # acceder a cada columna
             var_sym <- sym(var) 
+            
+            # Reasigmanos los valores al dataframe interno
+            # Donde lo primero que hacemos ees calcular la frecuencia
+            # absoluta y luego la relativa
+            # aclarando de que variable se trata al agregar la columna
+            # variable
             freqs_data_frame = freqs_data_frame |> 
                   bind_rows(
                         data_frame |> 
@@ -39,6 +51,9 @@ calcular_freqs = function(data_frame, lista_variables) {
 
 
 # Al finalizar el script guadamos las imagenes de las graficas
+# por ende creamos una función que recibe un vector el cual contendrá
+# un subvector cuyos elementos serán el nombre del archivo y el objeto ggpolot
+# correspondiente
 guardar_archivos = function(vector_archivos){
       for(v in vector_archivos){
             nombre = v[1]
@@ -46,21 +61,18 @@ guardar_archivos = function(vector_archivos){
             ggsave(
                   nombre,
                   plot = plot,
-                  device = NULL,
-                  path = NULL,
                   scale = 1,
-                  width = NA,
-                  height = NA,
                   units = c("in", "cm", "mm", "px"),
                   dpi = 300,
                   limitsize = TRUE,
                   bg = 'white',
-                  create.dir = FALSE
+                  create.dir = 'plots'
             )
       }
       
       return(TRUE)
 }
+
 
 # Cargamos los valores del archivo fuente
 datos = read_csv("datasets/simulated_HF_mort_data_for_GMPH.csv") 
@@ -75,41 +87,44 @@ variables_enfermedades = c('copd',
                            'pvd',
                            'valvular_disease',
                            'cancer',
-                           'pneumonia')
+                           'pneumonia',
+                           'stroke')
 
-
+# Definimos el vector de archivos a usar
 vector_archivos = c()
 
 
-# Cantidad de filas y columnas originalmente
-dimensiones = dim(datos)
-
-print(paste("Filas", dimensiones[1]))
-print(paste("Columnas", dimensiones[2]))
+# Obtemos la cantidad de filas y columnas del original
+dimensiones_original = dim(datos)
+print(paste("El dataset original tiene", dimensiones_original[1], "filas y", dimensiones_original[2], 'columnas'))
 
 
 # Revisamos los nombres de las variables/columnas
-colnames(datos)
+nombres_columnas = colnames(datos)
 
 # Comprobar si hay datos duplicados
 cant_duplicados = datos |> 
       duplicated() |> 
       sum()
 
+# Emitimos mensaje para confirmar que hay o no hay
+print(paste("En el dataset origianl", if_else(cant_duplicados != 0, paste0('hay duplicados (', cant_duplicados, ')'), 'No hay duplicados' ) ))
+rm(cant_duplicados)
+
 # Usamos summary para ver si hay o no NAs en cada columna
 summary(datos)
 
 
 # Otra opción para ver si hay NAs es usar colSums, si solo nos interesa ese dato
-colSums(datos)
-
 # Junto a la opción anterior, se pueda hacer uso de la función names para ver
 # que columnas es que tienen estos valores
-names(which(colSums(is.na(datos)) > 0))
+cols_con_nas = names(which(colSums(is.na(datos)) > 0))
+print(paste("Las columnas con na son ", paste(cols_con_nas, collapse = ', ')))
 
 
-# Emitimos mensaje para confirmar que hay o no hay
-print(if_else(cant_duplicados != 0, paste('Hay duplicados:', cant_duplicados), 'No hay duplicados' ) )
+
+# Borramos por que no las neceistamos más
+rm(hay_nas, counter, cols_con_na)
 
 # Con estos pipe hacemos: 
 # Filtrado de datos 
@@ -200,10 +215,10 @@ wich_max_freq_f = filtrados_f[4, which.max(filtrados_f$frec_rel)]
 print(paste("De las personas fallecidas ", max_freq_f, "% teninan ", wich_max_freq_f))
 
 
-# Calculo de mediana, media y desviación estándar de la edad de los pacinentes
-mediana = median(filtrados$age)
-media = mean(filtrados$age)
-desviacion = round(sd(filtrados$age), 2)
+# Calculo de mediana, media y desviación estándar de la edad de los pacinetes fallecidos
+mediana = median(fallecidos$age)
+media = mean(fallecidos$age)
+desviacion = round(sd(fallecidos$age), 2)
 
 # Vamos con los graficos
 
@@ -231,6 +246,7 @@ filtrados_f |>
             y = "Porcentaje",
       ) +
       geom_bar(stat = "identity") +
+      scale_y_continuous(breaks = seq(0, 60, by = 5)) +
       theme(legend.position = "none")+
       coord_flip()
 
@@ -245,27 +261,28 @@ filtrados_s |>
             color = "Enfermedad"
       ) +
       geom_bar(stat = "identity") +
+      scale_y_continuous(breaks = seq(0, 60, by = 5)) +
       theme(legend.position = "none")+
       coord_flip()
 
-
-# Falta grafica de vivos/muertos relación con la enfermedades ponderadas
-freq_precencia_enfermedades = sobrevivientes |> 
-                  count(ponderacion_enfermedades, name = "frec_abs") |> 
+# Tratamos de meter ambos ne un solo grafico
+freq_enfermedades = freqs_s |> 
+      filter(valor == 1, .preserve = T) |> 
+      mutate(
+            estado = "Vivos"
+      ) |> 
+      bind_rows(
+            freqs_f |> 
+                  filter(valor == 1, .preserve = T) |> 
                   mutate(
-                        frec_rel=frec_abs/cant_filas,
-                        estado = "vivos"
-                  ) |> 
-                  bind_rows(
-                        fallecidos |> 
-                              count(ponderacion_enfermedades, name = "frec_abs") |> 
-                              mutate(
-                                    frec_rel=frec_abs/cant_filas,
-                                    estado = "fallecidos"
-                              ) 
-                  )
+                        estado = "Fallecidos"
+                  ) 
+      )
 
-ggplot(freq_precencia_enfermedades, aes(x = factor(ponderacion_enfermedades), y = frec_abs, fill = estado)) +
+
+# Luego pasamoas a hacer una grafica de dos barras por enfermedad
+freq_enfermedades |> 
+      ggplot(aes(x = variable, y=round(frec_rel * 100, 3), fill = estado)) +
       geom_bar(stat = "identity", position = "dodge") +
       labs(
             title = "Frecuencia de estados según cantidad de enfermedades",
@@ -273,11 +290,41 @@ ggplot(freq_precencia_enfermedades, aes(x = factor(ponderacion_enfermedades), y 
             y = "Frecuencia absoluta",
             fill = "Estado"
       ) +
-      scale_fill_manual(values = c("vivos" = "steelblue", "fallecidos" = "firebrick")) +
+      scale_fill_manual(values = c("Vivos" = "blue", "Fallecidos" = "red")) +
+      scale_y_continuous(breaks = seq(0, 60, by = 5)) +
+      theme_minimal()
+
+#############################################################################
+#  Grafica de vivos/muertos en relación con la enfermedades ponderadas
+# Primero generamos un subconjunto de datos
+freq_precencia_enfermedades = sobrevivientes |> 
+                  count(ponderacion_enfermedades, name = "frec_abs") |> 
+                  mutate(
+                        frec_rel=frec_abs/cant_filas,
+                        estado = "Vivos"
+                  ) |> 
+                  bind_rows(
+                        fallecidos |> 
+                              count(ponderacion_enfermedades, name = "frec_abs") |> 
+                              mutate(
+                                    frec_rel=frec_abs/cant_filas,
+                                    estado = "Fallecidos"
+                              ) 
+                  )
+# Luego pasamoas a hacer una grafica de dos barras por enfermedad
+freq_precencia_enfermedades |> 
+      ggplot(aes(x = factor(ponderacion_enfermedades), y = frec_abs, fill = estado)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      labs(
+            title = "Frecuencia de estados según cantidad de enfermedades",
+            x = "Cantidad de enfermedades",
+            y = "Frecuencia absoluta",
+            fill = "Estado"
+      ) +
+      scale_fill_manual(values = c("Vivos" = "blue", "Fallecidos" = "red")) +
       theme_minimal()
 
 
-# QUIZAS LOS HISTOGRAMAS ESTÁN DE MAS, LO DEJO A TU CRITERIO
 
 # Histograma de personas que sobrevivieron
 sobrevivientes |> 
@@ -322,8 +369,8 @@ histograma_ambos = filtrados |>
       scale_y_continuous(breaks = seq(0, 100, by = 10)) +
       theme_minimal()
        
-
-
+# Visualizamos el histograma de ambos casos
+histograma_ambos
 
 
 #Dispersión
