@@ -230,6 +230,7 @@ mediana = median(fallecidos$age)
 media = round(mean(fallecidos$age))
 desviacion = round(sd(fallecidos$age), 2)
 
+
 print(paste("El promedio de edad de los fallecidos es", media))
 print(paste("La mediana de edad de los fallecidos es", mediana))
 print(paste("Los datos presentados tiene una desviación de ", desviacion))
@@ -506,6 +507,15 @@ coeficientes = filtrados |>
 coeficiente = round(coeficientes[1, 2], 2)
 print(paste("Coeficinete de correlacion entre la edad y el tiempo internado es de ", coeficiente ))
 
+# Ahora vemos sobre los fallecidos
+coeficientes = fallecidos |> 
+      #con esto selecciono las variables que me interesan
+      select(los, age) |> 
+      cor() 
+
+coeficiente = round(coeficientes[1, 2], 2)
+print(paste("Coeficinete de correlacion entre la edad y el tiempo internado de los fallecidos", coeficiente ))
+
 # Graficos de Boxplot
 gb_edades = filtrados |> 
       mutate(death = if_else(death == 0, 'No', 'Si')) |> 
@@ -522,6 +532,31 @@ gb_edades = filtrados |>
 
 lista_archivos = append(lista_archivos, list(list(nombre = 'gb_edades.png', grafico = gb_edades)))
 gb_edades
+
+fallecidos |> 
+      summarise(
+            mediana = median(fallecidos$age),
+            media = round(mean(fallecidos$age)),
+            desviacion = round(sd(fallecidos$age), 2),
+            varianza= var(age),
+            desv_est= sd(age),
+            coef_var= desv_est*100/mean(age)
+      )
+#Tengo una media de 84 años, con una "desviación promedio" con respecto a ella
+# de +- 8,79 años. Esto implica una variación del 10,7% con respecto a la media, 
+#lo cual es una leve variación.
+
+### De posición ------------------------------------------------------------
+
+#cuartiles
+fallecidos |> 
+      summarise(
+            q1= quantile(age,0.25),
+            q2= quantile(age,0.5),
+            q3 = quantile(age,0.75),
+            #rango intercuartílico
+            IQR =q3-q1
+      )
 
 # Gurdamos todos los archivos
 guardar_archivos(lista_archivos)
