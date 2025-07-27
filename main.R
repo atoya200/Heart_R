@@ -6,6 +6,8 @@ library(pheatmap)
 library(dplyr)
 library(rlang)
 
+# Limpiamos todo antes de iniciar
+rm(list = ls())
 
 # Funciones
 # Como son varias variables lo que hacemos es generar una función
@@ -54,25 +56,33 @@ calcular_freqs = function(data_frame, vector_variables) {
 # por ende creamos una función que recibe un vector el cual contendrá
 # un subvector cuyos elementos serán el nombre del archivo y el objeto ggpolot
 # correspondiente
-guardar_archivos = function(vector_archivos){
-      for(v in vector_archivos){
-            nombre = v[1]
-            plot = v[2]
+guardar_archivos = function(lista_archivos){
+
+      for(item in lista_archivos){
+            nombre = item$nombre
+            plot = item$grafico
+            
+            ruta_completa <- file.path(carpeta, nombre)
             ggsave(
-                  nombre,
+                  ruta_completa,
                   plot = plot,
                   scale = 1,
-                  units = c("in", "cm", "mm", "px"),
-                  dpi = 300,
-                  limitsize = TRUE,
-                  bg = 'white',
-                  create.dir = 'plots'
+                  width = 1920,      
+                  height = 1080,     
+                  units = "px",
+                  limitsize = FALSE,
+                  bg = 'white'
             )
       }
       
       return(TRUE)
 }
 
+# Creo carpeta donde estarán los graficos
+carpeta = 'plots'
+if (!dir.exists(carpeta)) {
+      dir.create(carpeta, recursive = TRUE)
+}
 
 # Cargamos los valores del archivo fuente
 datos = read_csv("datasets/simulated_HF_mort_data_for_GMPH.csv") 
@@ -91,7 +101,7 @@ variables_enfermedades = c('copd',
                            'stroke')
 
 # Definimos el vector de archivos a usar
-vector_archivos = c()
+lista_archivos = list()
 
 
 # Obtemos la cantidad de filas y columnas del original
@@ -100,7 +110,7 @@ print(paste("El dataset original tiene", dimensiones_original[1], "filas y", dim
 
 
 # Revisamos los nombres de las variables/columnas
-nombres_columnas = colnames(datos)
+print(paste("Las variables del dataframe son ", paste(colnames(datos), collapse= ', ') ))
 
 # Comprobar si hay datos duplicados
 cant_duplicados = datos |> 
@@ -124,7 +134,7 @@ print(paste("Las columnas con na son ", paste(cols_con_nas, collapse = ', ')))
 
 
 # Borramos por que no las neceistamos más
-rm(hay_nas, counter, cols_con_na)
+rm(cols_con_nas)
 
 # Con estos pipe hacemos: 
 # Filtrado de datos 
@@ -141,17 +151,16 @@ filtrados =   datos |>
              death,
              age,
              gender,
-             copd,
-             diabetes,
-             obesity,
+             copd, 
+             obesity, 
              renal_disease,
              hypertension,
              ihd,
              pvd,
              valvular_disease,
-             pacemaker,
              cancer,
-             pneumonia) |>
+             pneumonia,
+             stroke) |>
                         drop_na() |> 
                         distinct()
 
@@ -217,14 +226,18 @@ print(paste("De las personas fallecidas ", max_freq_f, "% teninan ", wich_max_fr
 
 # Calculo de mediana, media y desviación estándar de la edad de los pacinetes fallecidos
 mediana = median(fallecidos$age)
-media = mean(fallecidos$age)
+media = round(mean(fallecidos$age))
 desviacion = round(sd(fallecidos$age), 2)
+
+print(paste("El promedio de edad de los fallecidos es", media))
+print(paste("La mediana de edad de los fallecidos es", mediana))
+print(paste("Los datos presentados tiene una desviación de ", desviacion))
 
 # Vamos con los graficos
 
-# Grafico de Barras
+# Graficos de Barras
 # Cantidad por estado
-filtrados |> 
+gf_por_estado = filtrados |> 
       mutate(death = if_else(death == 0, 'Muertos', 'Vivos')) |> 
       ggplot(aes(x=death,  fill=death))+
       labs(
@@ -237,12 +250,30 @@ filtrados |>
       theme(legend.position = "none")+
       coord_flip()
 
-# Calculamos por precencia de enfermedad en fallecidos
-filtrados_f |> 
+# Lo agregamos al vector
+lista_archivos = append(lista_archivos, list(list(nombre ='gf_por_estado.png', grafico =gf_por_estado)))
+
+# Lo mostramos
+gf_por_estado
+
+# Graficamos presencia de enfermedad en fallecidos
+gf_enferemdad_fallecidos = filtrados_f |> 
+      mutate( variable = recode(variable, 
+            "copd" = "EPOC",
+            "obesity" = "Obesidad",
+            "renal_disease" = "Enfermedad Renal",
+            "hypertension" = "Hipertensión",
+            "ihd" = "Cardiopatía isquémica",
+            "pvd" = "Enfermedad Vascular Periférica",
+            "valvular_disease" = "Enfermedad valvular cardíaca",
+            "cancer" = "Cáncer",
+            "pneumonia" = "Neumonía",
+            "stroke" = "ACV")
+      ) |> 
       ggplot(aes(x=variable, y=round(frec_rel * 100, 3),  fill=variable))+
       labs(
-            title = "Representación grafica de porcentaje de precencia de enfermedades en los fallecidos",
-            x = "Enfermedad",
+            title = "Representación grafica de porcentaje de presencia de enfermedades en los fallecidos",
+            x = "Enfermedad Previa",
             y = "Porcentaje",
       ) +
       geom_bar(stat = "identity") +
@@ -250,13 +281,27 @@ filtrados_f |>
       theme(legend.position = "none")+
       coord_flip()
 
+lista_archivos = append(lista_archivos, list(list(nombre = 'gf_enferemdad_fallecidos.png', grafico = gf_enferemdad_fallecidos)))
+gf_enferemdad_fallecidos
 
-# Calculamos por precencia de enfermedad en sobrevivientes
-filtrados_s |> 
+# Calculamos por presencia de enfermedad en sobrevivientes
+gf_enferemdad_sobrevivientes = filtrados_s |> 
+      mutate( variable = recode(variable, 
+                                "copd" = "EPOC",
+                                "obesity" = "Obesidad",
+                                "renal_disease" = "Enfermedad Renal",
+                                "hypertension" = "Hipertensión",
+                                "ihd" = "Cardiopatía isquémica",
+                                "pvd" = "Enfermedad Vascular Periférica",
+                                "valvular_disease" = "Enfermedad valvular cardíaca",
+                                "cancer" = "Cáncer",
+                                "pneumonia" = "Neumonía",
+                                "stroke" = "ACV")
+      ) |> 
       ggplot(aes(x=variable, y=round(frec_rel * 100, 3),  fill=variable))+
       labs(
-            title = "Representación grafica de porcentaje de precencia de enfermedades en los sobrevivientes",
-            x = "Enfermedad",
+            title = "Representación grafica de porcentaje de presencia de enfermedades en los sobrevivientes",
+            x = "Enfermedad Previa",
             y = "Porcentaje",
             color = "Enfermedad"
       ) +
@@ -265,7 +310,11 @@ filtrados_s |>
       theme(legend.position = "none")+
       coord_flip()
 
-# Tratamos de meter ambos ne un solo grafico
+lista_archivos = append(lista_archivos, list(list(nombre = 'gf_enferemdad_sobrevivientes.png', grafico =gf_enferemdad_sobrevivientes)))
+gf_enferemdad_sobrevivientes
+
+# Colocamos ambos en un mismo gráfico para una mejor comparación
+# Para eso primero nos hacemos un dataframe que incorpore ambos datos
 freq_enfermedades = freqs_s |> 
       filter(valor == 1, .preserve = T) |> 
       mutate(
@@ -279,25 +328,41 @@ freq_enfermedades = freqs_s |>
                   ) 
       )
 
-
-# Luego pasamoas a hacer una grafica de dos barras por enfermedad
-freq_enfermedades |> 
+# Ahora armamos el gráfico
+gf_enfermedades = freq_enfermedades |> 
+      mutate( variable = recode(variable, 
+                                "copd" = "EPOC",
+                                "obesity" = "Obesidad",
+                                "renal_disease" = "Enfermedad Renal",
+                                "hypertension" = "Hipertensión",
+                                "ihd" = "Cardiopatía isquémica",
+                                "pvd" = "Enfermedad Vascular Periférica",
+                                "valvular_disease" = "Enfermedad valvular cardíaca",
+                                "cancer" = "Cáncer",
+                                "pneumonia" = "Neumonía",
+                                "stroke" = "ACV")
+      ) |>
       ggplot(aes(x = variable, y=round(frec_rel * 100, 3), fill = estado)) +
       geom_bar(stat = "identity", position = "dodge") +
       labs(
-            title = "Frecuencia de estados según cantidad de enfermedades",
-            x = "Cantidad de enfermedades",
-            y = "Frecuencia absoluta",
+            title = "Porcentaje de presencia de enfermedades distinguiendo entre estados",
+            x = "Enfermedades previas",
+            y = "Porcentaje",
             fill = "Estado"
       ) +
       scale_fill_manual(values = c("Vivos" = "blue", "Fallecidos" = "red")) +
       scale_y_continuous(breaks = seq(0, 60, by = 5)) +
       theme_minimal()
 
+
+
+lista_archivos = append(lista_archivos, list(list(nombre ='gf_enfermedades.png', grafico = gf_enfermedades)))
+gf_enfermedades
+
 #############################################################################
-#  Grafica de vivos/muertos en relación con la enfermedades ponderadas
+#  Grafica de vivos/muertos en relación con la cantidad de enfermedades presentes
 # Primero generamos un subconjunto de datos
-freq_precencia_enfermedades = sobrevivientes |> 
+freq_presencia_enfermedades = sobrevivientes |> 
                   count(ponderacion_enfermedades, name = "frec_abs") |> 
                   mutate(
                         frec_rel=frec_abs/cant_filas,
@@ -312,22 +377,24 @@ freq_precencia_enfermedades = sobrevivientes |>
                               ) 
                   )
 # Luego pasamoas a hacer una grafica de dos barras por enfermedad
-freq_precencia_enfermedades |> 
+gf_cant_enfermeddes = freq_presencia_enfermedades |> 
       ggplot(aes(x = factor(ponderacion_enfermedades), y = frec_abs, fill = estado)) +
       geom_bar(stat = "identity", position = "dodge") +
       labs(
             title = "Frecuencia de estados según cantidad de enfermedades",
             x = "Cantidad de enfermedades",
-            y = "Frecuencia absoluta",
+            y = "Cantidad de personas",
             fill = "Estado"
       ) +
       scale_fill_manual(values = c("Vivos" = "blue", "Fallecidos" = "red")) +
+      scale_y_continuous(breaks = seq(0, max(freq_presencia_enfermedades$frec_abs) + 40, by = 10)) +
       theme_minimal()
 
-
+lista_archivos = append(lista_archivos, list(list(nombre = 'gf_cant_enfermeddes.png', grafico = gf_cant_enfermeddes)))
+gf_cant_enfermeddes
 
 # Histograma de personas que sobrevivieron
-sobrevivientes |> 
+hg_sobrevivientes =  sobrevivientes |> 
       ggplot(aes(x=age))+
       geom_histogram(fill="darkolivegreen3", color='black',
                      bins = 20)+
@@ -340,8 +407,11 @@ sobrevivientes |>
             scale_y_continuous(breaks = seq(0, 100, by = 10)) +
             theme_minimal()
 
+lista_archivos = append(lista_archivos, list(list(nombre = 'hg_sobrevivientes.png', grafico  = hg_sobrevivientes)))
+hg_sobrevivientes
+
 # Histograma de personas que no sobrevivieron
-fallecidos |> 
+hg_fallecidos = fallecidos |> 
       ggplot(aes(x=age))+
       geom_histogram(fill="red", color='black',
                bins = 20)+
@@ -354,15 +424,18 @@ fallecidos |>
       scale_y_continuous(breaks = seq(0, 100, by = 10)) +
       theme_minimal()
 
+lista_archivos = append(lista_archivos, list(list(nombre = 'hg_fallecidos.png', grafico  = hg_fallecidos)))
+hg_fallecidos
+
 # Ambos en el mismo grafico
-histograma_ambos = filtrados |> 
+hg_edades_por_estado = filtrados |> 
       ggplot(aes(x = age, fill = factor(death))) +
       geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
       labs(
-            title = "Distribución de edades según muerte",
+            title = "Distribución de edades según estado",
             x = "Edad",
-            y = "Frecuencia",
-            fill = "Muerte"
+            y = "Cantidad",
+            fill = "Estado"
       ) +
       scale_fill_manual(values = c("blue", "red"), labels = c("Sobrevivio", "Murió")) +
       scale_x_continuous(breaks = seq(0, max(filtrados$age), by = 5), limits = c(0, 100)) +
@@ -370,11 +443,12 @@ histograma_ambos = filtrados |>
       theme_minimal()
        
 # Visualizamos el histograma de ambos casos
-histograma_ambos
+lista_archivos = append(lista_archivos, list(list(nombre = 'hg_edades_por_estado.png', grafico  = hg_edades_por_estado)))
+hg_edades_por_estado
 
-
-#Dispersión
-filtrados |> 
+# Vamos con los gráficos de Dispersión
+gd_edades_hispitalizacion = 
+      filtrados |> 
       mutate(death = if_else(death == 0, FALSE, TRUE)) |> 
       ggplot(aes(x = age, y = los, color = death)) + 
       geom_point() +
@@ -388,21 +462,48 @@ filtrados |>
             values = c("blue", "red"),
             labels = c("Sobrevivió", "Murió")
       ) +
-      scale_x_continuous(breaks = seq(0, max(filtrados$age), by = 5), limits = c(0, 100))
+      scale_x_continuous(breaks = seq(min(filtrados$age), max(filtrados$age), by = 5))+
+      scale_y_continuous(breaks = seq(0, max(filtrados$los), by = 5))
+
+lista_archivos = append(lista_archivos, list(list(nombre = 'gd_edades_hispitalizacion.png', grafico = gd_edades_hispitalizacion)))
+gd_edades_hispitalizacion
+
+# Este otro es referente a la cantidad de enfermedades presentes
+gd_edades_por_enfermedades_hispitalizacion = 
+      filtrados |> 
+      mutate(death = if_else(death == 0, FALSE, TRUE)) |> 
+      ggplot() + 
+      geom_point(aes(x = age, y = los, color = death, size = ponderacion_enfermedades)) +
+      labs(
+            title = "Distribución de edades según tiempo de hospitalización con coloreado por estado",
+            x = "Edad",
+            y = "Días internados",
+            color = "Estado",
+            size = "Cantidad Enfermedades"
+      ) +
+      scale_color_manual(
+            values = c("blue", "red"),
+            labels = c("Sobrevivió", "Murió")
+      ) +
+      scale_x_continuous(breaks = seq(min(filtrados$age), max(filtrados$age), by = 5))+
+      scale_y_continuous(breaks = seq(0, max(filtrados$los), by = 5))
+
+lista_archivos = append(lista_archivos, list(list(nombre = 'gd_edades_por_enfermedades_hispitalizacion.png', grafico = gd_edades_por_enfermedades_hispitalizacion)))
+gd_edades_por_enfermedades_hispitalizacion
 
 
 
-# De mientras, la correlación la podemos ver de esta forma
+# La correlación la podemos obtener de esta forma
 coeficientes = filtrados |> 
-      #con esto selecciono todas las variables numéricas
+      #con esto selecciono las variables que me interesan
       select(los, age) |> 
       cor() 
 
 coeficiente = round(coeficientes[1, 2], 2)
-print(parse("Coeficinete de correlacion entre la edad y el tiempo internado es de ", coeficiente ))
+print(paste("Coeficinete de correlacion entre la edad y el tiempo internado es de ", coeficiente ))
 
-# Boxplot
-filtrados |> 
+# Graficos de Boxplot
+gb_edades = filtrados |> 
       mutate(death = if_else(death == 0, 'No', 'Si')) |> 
       ggplot(aes(x=age,y=death,
            fill=death))+
@@ -412,6 +513,13 @@ filtrados |>
             y = "Fallecio"
       ) +
       theme(legend.position = "none")+
-      scale_x_continuous(breaks = seq(0, max(filtrados$age), by = 10))+
+      scale_x_continuous(breaks = seq(0, max(filtrados$age), by = 5))+
       geom_boxplot()
 
+lista_archivos = append(lista_archivos, list(list(nombre = 'gb_edades.png', grafico = gb_edades)))
+gb_edades
+
+# Gurdamos todos los archivos
+guardar_archivos(lista_archivos)
+
+print("Se han guardado todos los graficos")
