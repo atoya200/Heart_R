@@ -5,6 +5,7 @@ library(readxl)
 library(pheatmap)
 library(dplyr)
 library(rlang)
+library(writexl)
 
 # Limpiamos todo antes de iniciar
 rm(list = ls())
@@ -398,6 +399,7 @@ gf_cant_enfermeddes
 hg_sobrevivientes =  sobrevivientes |> 
       ggplot(aes(x=age))+
       geom_histogram(fill="blue",
+                     color = "black",
                      bins = 20)+
       labs(
             title = "Distribución de edades de los sobrevivientes",
@@ -414,8 +416,9 @@ hg_sobrevivientes
 # Histograma de personas que no sobrevivieron
 hg_fallecidos = fallecidos |> 
       ggplot(aes(x=age))+
-      geom_histogram(fill="red",
-               bins = 20)+
+      geom_histogram(fill="red", 
+                     color="black",
+                     bins = 20)+
       labs(
             title = "Distribución de edades de los fallecidos",
             x = "Edad",
@@ -451,7 +454,7 @@ hg_edades_por_estado
 gd_edades_hispitalizacion = 
       filtrados |> 
       mutate(death = if_else(death == 0, FALSE, TRUE)) |> 
-      ggplot(aes(x = age, y = los, color = death)) + 
+      ggplot(aes(x = age, y = los, color = death), alpha=0.4) + 
       geom_point() +
       labs(
             title = "Distribución de edades según tiempo de hospitalización con coloreado por estado",
@@ -474,7 +477,7 @@ gd_edades_por_enfermedades_hispitalizacion =
       filtrados |> 
       mutate(death = if_else(death == 0, FALSE, TRUE)) |> 
       ggplot() + 
-      geom_point(aes(x = age, y = los, color = death, size = ponderacion_enfermedades)) +
+      geom_point(aes(x = age, y = los, color = death, size = ponderacion_enfermedades), alpha=0.4) +
       labs(
             title = "Distribución de edades según tiempo de hospitalización con coloreado por estado",
             x = "Edad",
@@ -524,3 +527,26 @@ gb_edades
 guardar_archivos(lista_archivos)
 
 print("Se han guardado todos los graficos")
+
+# Exportamos cuadro de frecuencias relativas de enfermedades para los fallecidos
+freqs_f |> 
+      filter(valor == 1, .preserve = T) |> 
+      select(-valor) |> 
+      mutate(
+            frec_rel = round(frec_rel,3),
+            porcentaje =round(frec_rel,3) * 100,
+            variable = recode(variable, 
+                                      "copd" = "EPOC",
+                                      "obesity" = "Obesidad",
+                                      "renal_disease" = "Enfermedad Renal",
+                                      "hypertension" = "Hipertensión",
+                                      "ihd" = "Cardiopatía Isquémica",
+                                      "pvd" = "Enfermedad Vascular Periférica",
+                                      "valvular_disease" = "Enfermedad Valvular Cardíaca",
+                                      "cancer" = "Cáncer",
+                                      "pneumonia" = "Neumonía",
+                                      "stroke" = "ACV")
+      ) |> 
+      rename(Enfermedad = variable) |> 
+      write_xlsx("frecuencias_fallecidos.xlsx")
+
