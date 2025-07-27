@@ -67,8 +67,8 @@ guardar_archivos = function(lista_archivos){
                   ruta_completa,
                   plot = plot,
                   scale = 1,
-                  width = 1920,      
-                  height = 1080,     
+                  width = 3840,      
+                  height = 2160 ,     
                   units = "px",
                   limitsize = FALSE,
                   bg = 'white'
@@ -245,7 +245,7 @@ gf_por_estado = filtrados |>
             x = "Estado",
             y = "Cantidad",
       ) +
-      scale_y_continuous(breaks = seq(0, cant_filas, by = 20)) +
+      scale_y_continuous(breaks = seq(0, cant_filas, by = 50)) +
       geom_bar() +
       theme(legend.position = "none")+
       coord_flip()
@@ -272,7 +272,7 @@ gf_enferemdad_fallecidos = filtrados_f |>
       ) |> 
       ggplot(aes(x=variable, y=round(frec_rel * 100, 3),  fill=variable))+
       labs(
-            title = "Representación grafica de porcentaje de presencia de enfermedades en los fallecidos",
+            title = "Porcentaje de presencia de enfermedades en los fallecidos",
             x = "Enfermedad Previa",
             y = "Porcentaje",
       ) +
@@ -300,7 +300,7 @@ gf_enferemdad_sobrevivientes = filtrados_s |>
       ) |> 
       ggplot(aes(x=variable, y=round(frec_rel * 100, 3),  fill=variable))+
       labs(
-            title = "Representación grafica de porcentaje de presencia de enfermedades en los sobrevivientes",
+            title = "Porcentaje de presencia de enfermedades en los sobrevivientes",
             x = "Enfermedad Previa",
             y = "Porcentaje",
             color = "Enfermedad"
@@ -343,7 +343,7 @@ gf_enfermedades = freq_enfermedades |>
                                 "stroke" = "ACV")
       ) |>
       ggplot(aes(x = variable, y=round(frec_rel * 100, 3), fill = estado)) +
-      geom_bar(stat = "identity", position = "dodge") +
+      geom_bar(stat = "identity", position = "dodge", width = 0.5) +
       labs(
             title = "Porcentaje de presencia de enfermedades distinguiendo entre estados",
             x = "Enfermedades previas",
